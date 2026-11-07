@@ -1,0 +1,33 @@
+name: Build unsigned IPA
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Build (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project VodRecoveryTV.xcodeproj -target VodRecoveryTV \
+            -configuration Release -sdk appletvos \
+            SYMROOT="$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            build 2>&1 | grep -E "error:|warning: .*(deprecated|unavailable)|BUILD (SUCCEEDED|FAILED)|\*\*" | head -80
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -R build/Release-appletvos/VodRecoveryTV.app Payload/
+          zip -qry VodRecoveryTV.ipa Payload
+          ls -la VodRecoveryTV.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VodRecoveryTV-ipa
+          path: VodRecoveryTV.ipa
