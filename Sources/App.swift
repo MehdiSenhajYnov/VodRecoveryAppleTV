@@ -1,15 +1,36 @@
 import SwiftUI
 
-@main
-struct VodRecoveryApp: App {
+/// Racine autonome de VOD Recovery : utilisée par l'app seule (Main.swift)
+/// comme par le hub MyApps, qui l'embarque telle quelle.
+struct VodRecoveryRoot: View {
     @StateObject private var store = ChannelStore()
 
-    var body: some Scene {
-        WindowGroup {
-            RootView()
-                .environmentObject(store)
-                .preferredColorScheme(.dark)
-        }
+    init() {}
+
+    var body: some View {
+        RootView()
+            .environmentObject(store)
+            .preferredColorScheme(.dark)
+    }
+}
+
+/// Fourni par une app hôte (MyApps) : appelé quand on appuie sur « Retour »
+/// depuis l'écran d'accueil. Absent quand l'app tourne seule.
+private struct ExitAppKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var exitApp: (() -> Void)? {
+        get { self[ExitAppKey.self] }
+        set { self[ExitAppKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Branche le bouton « Retour » de l'écran d'accueil sur l'app hôte.
+    func exitAppHandler(_ action: (() -> Void)?) -> some View {
+        environment(\.exitApp, action)
     }
 }
 

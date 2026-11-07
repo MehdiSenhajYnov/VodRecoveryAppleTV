@@ -4,6 +4,7 @@ import SwiftUI
 /// favoris épinglés puis chaînes récentes en dessous.
 struct HomeView: View {
     @EnvironmentObject private var store: ChannelStore
+    @Environment(\.exitApp) private var exitApp
     @State private var query = ""
     let open: (String) -> Void
 
@@ -48,6 +49,7 @@ struct HomeView: View {
             .padding(.vertical, 70)
         }
         .screenBackground()
+        .onExitCommand(perform: exitApp)
     }
 
     private func submit() {
