@@ -19,7 +19,7 @@ final class PlaylistServer {
     }
 
     private func ensureRunning() async throws -> UInt16 {
-        if let current = queue.sync(execute: { listener != nil && port != 0 ? port : nil }) {
+        if let current = queue.sync(execute: { self.listener != nil && self.port != 0 ? self.port : nil }) {
             return current
         }
         let parameters = NWParameters.tcp
