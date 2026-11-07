@@ -1,0 +1,37 @@
+workflows:
+  tvos-ipa:
+    name: VOD Recovery TV (IPA non signée)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: latest
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+    scripts:
+      - name: Outils
+        script: |
+          xcodebuild -version
+          brew install xcodegen
+      - name: Projet Xcode
+        script: xcodegen generate
+      - name: Compilation (sans signature)
+        script: |
+          set -o pipefail
+          xcodebuild -project VodRecoveryTV.xcodeproj -target VodRecoveryTV \
+            -configuration Release -sdk appletvos \
+            SYMROOT="$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            build > build.log 2>&1 || { grep -E "error:" build.log | sort -u | head -80; exit 1; }
+          grep -E "BUILD SUCCEEDED" build.log
+      - name: Paquet IPA
+        script: |
+          mkdir Payload
+          cp -R build/Release-appletvos/VodRecoveryTV.app Payload/
+          zip -qry VodRecoveryTV.ipa Payload
+          ls -la VodRecoveryTV.ipa
+    artifacts:
+      - VodRecoveryTV.ipa
+      - build.log
