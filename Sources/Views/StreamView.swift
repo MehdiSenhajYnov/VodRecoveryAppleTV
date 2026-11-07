@@ -16,16 +16,20 @@ struct StreamView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 70) {
-            details
-                .frame(width: 760)
-            panel
-                .frame(maxWidth: .infinity, alignment: .leading)
+        ZStack(alignment: .bottomLeading) {
+            backdrop
+            VStack(alignment: .leading, spacing: 44) {
+                titleBlock
+                status
+                actions
+                options
+            }
+            .frame(maxWidth: 1250, alignment: .leading)
+            .padding(.horizontal, Theme.hPad)
+            .padding(.bottom, 80)
         }
-        .padding(.horizontal, 90)
-        .padding(.vertical, 70)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .screenBackground()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .ignoresSafeArea()
         .onAppear { model.start(store: store) }
         .onDisappear { model.cancel() }
         .onChange(of: model.phase) { _, phase in
@@ -48,66 +52,60 @@ struct StreamView: View {
         }
     }
 
-    // MARK: - Colonne gauche
+    // MARK: - Fond : la vignette du stream en plein écran, assombrie
 
-    private var details: some View {
-        VStack(alignment: .leading, spacing: 30) {
+    private var backdrop: some View {
+        ZStack {
+            Theme.base
             Thumbnail(url: model.stream.thumbnail)
-                .aspectRatio(16 / 9, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-                .shadow(color: .black.opacity(0.4), radius: 30, y: 16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(0.55)
+            LinearGradient(
+                stops: [
+                    .init(color: Theme.base.opacity(0.98), location: 0),
+                    .init(color: Theme.base.opacity(0.85), location: 0.38),
+                    .init(color: Theme.base.opacity(0.25), location: 1),
+                ],
+                startPoint: .leading, endPoint: .trailing
+            )
+            LinearGradient(
+                colors: [.clear, Theme.base.opacity(0.9)],
+                startPoint: .center, endPoint: .bottom
+            )
+        }
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Titre et infos
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(store.entry(model.login)?.displayName ?? model.login)
+                .font(.headline)
+                .foregroundStyle(Theme.accent)
             Text(model.stream.title.isEmpty ? "Stream sans titre" : model.stream.title)
-                .font(.title2.weight(.bold))
-                .lineLimit(3)
-            VStack(alignment: .leading, spacing: 10) {
-                Label(Format.longDate(model.stream.start), systemImage: "calendar")
+                .font(.system(size: 58, weight: .bold))
+                .lineLimit(2)
+            HStack(spacing: 14) {
+                Text(Format.longDate(model.stream.start))
                 if let duration = Format.duration(model.prepared?.duration ?? model.stream.duration) {
-                    Label(duration, systemImage: "clock")
+                    Text("·")
+                    Text(duration)
                 }
-                Label("Stream \(model.stream.streamID)", systemImage: "number")
+                if let quality = model.quality {
+                    Text(Recovery.label(for: quality))
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.secondary, lineWidth: 1.5))
+                }
             }
             .font(.callout)
             .foregroundStyle(.secondary)
         }
     }
 
-    // MARK: - Panneau d'action (verre)
-
-    private var panel: some View {
-        VStack(alignment: .leading, spacing: 40) {
-            status
-
-            if !model.qualities.isEmpty {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Qualité").font(.headline).foregroundStyle(.secondary)
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 20) {
-                            ForEach(model.qualities, id: \.self) { quality in
-                                qualityChip(quality)
-                            }
-                        }
-                        .padding(.vertical, 16)
-                        .padding(.horizontal, 4)
-                    }
-                    .scrollClipDisabled()
-                }
-                .focusSection()
-            }
-
-            if model.qualities.isEmpty == false || model.phase == .ready {
-                HStack(spacing: 24) {
-                    Toggle(isOn: $model.unmute) { Label("Démuter", systemImage: "speaker.wave.2") }
-                    Toggle(isOn: $model.verify) { Label("Vérifier les segments", systemImage: "checkmark.shield") }
-                }
-                .focusSection()
-            }
-
-            actions
-        }
-        .padding(48)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 48, style: .continuous))
-    }
+    // MARK: - État de la récupération
 
     @ViewBuilder
     private var status: some View {
@@ -123,25 +121,17 @@ struct StreamView: View {
         case .preparing(let fraction):
             progressBlock(
                 title: model.verify ? "Vérification des segments…" : "Préparation de la lecture…",
-                detail: model.unmute ? "Restauration du son des passages coupés" : "Lecture du son tel quel",
+                detail: model.unmute ? "Restauration du son des passages coupés" : "Son d'origine",
                 value: fraction > 0 ? fraction : nil
             )
         case .ready:
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Prêt à regarder", systemImage: "checkmark.circle.fill")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(.green)
-                if let summary {
-                    Text(summary).foregroundStyle(.secondary)
-                }
-            }
+            Label(summary ?? "Prêt à regarder", systemImage: "checkmark.circle.fill")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         case .failed(let message):
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Introuvable", systemImage: "xmark.octagon.fill")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(.orange)
-                Text(message).foregroundStyle(.secondary)
-            }
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(.orange.opacity(0.9))
         }
     }
 
@@ -155,35 +145,20 @@ struct StreamView: View {
     }
 
     private func progressBlock(title: String, detail: String, value: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(title).font(.title2.weight(.bold))
-            Group {
-                if let value {
-                    ProgressView(value: value)
-                } else {
-                    ProgressView().progressViewStyle(.linear)
-                }
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 16) {
+                ProgressView()
+                Text(title).font(.title3.weight(.semibold))
             }
-            .tint(.purple)
-            Text(detail).foregroundStyle(.secondary)
+            if let value {
+                ProgressView(value: value)
+                    .frame(maxWidth: 700)
+            }
+            Text(detail).font(.callout).foregroundStyle(.secondary)
         }
     }
 
-    @ViewBuilder
-    private func qualityChip(_ quality: String) -> some View {
-        let selected = quality == model.quality
-        let label = Text(Recovery.label(for: quality))
-            .fontWeight(selected ? .bold : .regular)
-            .padding(.horizontal, 6)
-        if selected {
-            Button { model.select(quality) } label: { label }
-                .buttonStyle(.glassProminent)
-        } else {
-            Button { model.select(quality) } label: { label }
-                .buttonStyle(.glass)
-                .disabled(model.isWorking)
-        }
-    }
+    // MARK: - Actions
 
     @ViewBuilder
     private var actions: some View {
@@ -195,7 +170,7 @@ struct StreamView: View {
                 } label: {
                     Label("Lire", systemImage: "play.fill")
                         .font(.title3.weight(.bold))
-                        .padding(.horizontal, 30)
+                        .padding(.horizontal, 34)
                 }
                 .buttonStyle(.glassProminent)
                 .focused($focus, equals: .play)
@@ -204,7 +179,7 @@ struct StreamView: View {
                     Button {
                         model.open(in: player)
                     } label: {
-                        Label(player.rawValue, systemImage: player == .vlc ? "play.tv" : "arrow.up.forward.app")
+                        Label(player.rawValue, systemImage: "arrow.up.forward.app")
                     }
                     .buttonStyle(.glass)
                 }
@@ -223,6 +198,44 @@ struct StreamView: View {
         default:
             EmptyView()
         }
+    }
+
+    // MARK: - Réglages (qualité, son, vérification)
+
+    @ViewBuilder
+    private var options: some View {
+        if !model.qualities.isEmpty {
+            HStack(spacing: 18) {
+                ForEach(model.qualities, id: \.self) { quality in
+                    qualityChip(quality)
+                }
+                Divider().frame(height: 40).padding(.horizontal, 10)
+                optionChip("Démuter", isOn: model.unmute) { model.unmute.toggle() }
+                optionChip("Vérifier les segments", isOn: model.verify) { model.verify.toggle() }
+            }
+            .font(.callout)
+            .focusSection()
+        }
+    }
+
+    @ViewBuilder
+    private func qualityChip(_ quality: String) -> some View {
+        let selected = quality == model.quality
+        Button { model.select(quality) } label: {
+            Text(Recovery.label(for: quality))
+                .fontWeight(selected ? .bold : .regular)
+                .foregroundStyle(selected ? .primary : .secondary)
+        }
+        .buttonStyle(.glass)
+        .disabled(model.isWorking && !selected)
+    }
+
+    private func optionChip(_ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: isOn ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isOn ? .primary : .secondary)
+        }
+        .buttonStyle(.glass)
     }
 }
 

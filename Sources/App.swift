@@ -11,6 +11,7 @@ struct VodRecoveryRoot: View {
         RootView()
             .environmentObject(store)
             .preferredColorScheme(.dark)
+            .tint(Theme.accent)
     }
 }
 
@@ -57,24 +58,25 @@ struct RootView: View {
     }
 }
 
-/// Fond sombre coloré : donne de la matière au verre (Liquid Glass) au-dessus.
+/// Palette sobre : presque noir, un seul accent lavande désaturé utilisé avec parcimonie.
+/// Pensée pour une pièce sombre : rien de saturé, pas de grands aplats lumineux.
+enum Theme {
+    static let base = Color(red: 0.045, green: 0.047, blue: 0.058)
+    static let raised = Color(red: 0.11, green: 0.115, blue: 0.135)
+    static let accent = Color(red: 0.68, green: 0.64, blue: 0.92)
+    static let hPad: CGFloat = 80
+}
+
+/// Fond quasi noir avec une très légère lueur froide en haut : donne juste
+/// assez de matière au verre (Liquid Glass) sans éblouir.
 struct AppBackground: View {
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(red: 0.10, green: 0.05, blue: 0.20), Color(red: 0.02, green: 0.02, blue: 0.06)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
+            Theme.base
+            RadialGradient(
+                colors: [Color(red: 0.30, green: 0.32, blue: 0.45).opacity(0.22), .clear],
+                center: .init(x: 0.2, y: -0.1), startRadius: 0, endRadius: 1400
             )
-            Circle()
-                .fill(Color(red: 0.57, green: 0.27, blue: 1.0).opacity(0.45))
-                .frame(width: 1000, height: 1000)
-                .blur(radius: 240)
-                .offset(x: -650, y: -420)
-            Circle()
-                .fill(Color(red: 0.12, green: 0.50, blue: 1.0).opacity(0.28))
-                .frame(width: 900, height: 900)
-                .blur(radius: 260)
-                .offset(x: 720, y: 460)
         }
         .ignoresSafeArea()
     }
@@ -83,6 +85,29 @@ struct AppBackground: View {
 extension View {
     func screenBackground() -> some View {
         background(AppBackground())
+    }
+}
+
+/// Style de bouton « soulevé » : l'élément grossit doucement et s'éclaire au focus.
+struct LiftButtonStyle: ButtonStyle {
+    var scale: CGFloat = 1.08
+
+    func makeBody(configuration: Configuration) -> some View {
+        LiftBody(configuration: configuration, scale: scale)
+    }
+
+    private struct LiftBody: View {
+        let configuration: ButtonStyleConfiguration
+        let scale: CGFloat
+        @Environment(\.isFocused) private var focused
+
+        var body: some View {
+            configuration.label
+                .scaleEffect(configuration.isPressed ? scale - 0.04 : (focused ? scale : 1))
+                .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 24, y: 14)
+                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: focused)
+                .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+        }
     }
 }
 
@@ -95,10 +120,10 @@ struct Avatar: View {
             image.resizable().scaledToFill()
         } placeholder: {
             ZStack {
-                LinearGradient(colors: [.purple, .indigo], startPoint: .top, endPoint: .bottom)
+                Theme.raised
                 Text(String(name.prefix(1)).uppercased())
-                    .font(.system(size: 60, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 64, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
             }
         }
         .clipShape(Circle())

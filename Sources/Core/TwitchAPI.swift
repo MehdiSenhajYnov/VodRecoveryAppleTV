@@ -90,8 +90,8 @@ enum TwitchAPI {
                 if abs(exact.timeIntervalSince(created)) < 86400 { start = exact }
             }
             let sized = preview
-                .replacingOccurrences(of: "%{width}", with: "640").replacingOccurrences(of: "%{height}", with: "360")
-                .replacingOccurrences(of: "{width}", with: "640").replacingOccurrences(of: "{height}", with: "360")
+                .replacingOccurrences(of: "%{width}", with: "1280").replacingOccurrences(of: "%{height}", with: "720")
+                .replacingOccurrences(of: "{width}", with: "1280").replacingOccurrences(of: "{height}", with: "720")
             let thumb = preview.isEmpty || preview.contains("404_processing") ? nil : URL(string: sized)
             return StreamInfo(
                 streamID: extracted?.streamID ?? (node["id"] as? String ?? ""),

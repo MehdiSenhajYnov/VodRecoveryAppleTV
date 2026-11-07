@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Premier écran : « Explorer une chaîne ». Champ de recherche en haut,
-/// favoris épinglés puis chaînes récentes en dessous.
+/// Premier écran : « Explorer une chaîne ». Recherche en haut, puis favoris
+/// épinglés et chaînes récentes en rangées qui vont d'un bord à l'autre.
 struct HomeView: View {
     @EnvironmentObject private var store: ChannelStore
     @Environment(\.exitApp) private var exitApp
@@ -10,46 +10,74 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 56) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Explorer une chaîne")
-                        .font(.system(size: 72, weight: .bold))
-                    Text("Retrouve et regarde les VOD Twitch, même celles qui ont été supprimées.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack(spacing: 28) {
-                    TextField("Nom de la chaîne Twitch", text: $query)
-                        .onSubmit(submit)
-                        .frame(maxWidth: 1150)
-                    Button(action: submit) {
-                        Label("Explorer", systemImage: "arrow.right")
-                            .padding(.horizontal, 12)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .disabled(query.normalizedChannel.isEmpty)
-                }
-                .focusSection()
+            VStack(alignment: .leading, spacing: 64) {
+                header
+                    .padding(.horizontal, Theme.hPad)
 
                 if !store.favorites.isEmpty {
-                    ChannelShelf(title: "Favoris", systemImage: "star.fill", entries: store.favorites, open: open)
+                    ChannelShelf(title: "Favoris", entries: store.favorites, open: open)
                 }
                 if !store.history.isEmpty {
-                    ChannelShelf(title: "Récents", systemImage: "clock.arrow.circlepath", entries: store.history, open: open)
+                    ChannelShelf(title: "Récents", entries: store.history, open: open)
                 }
 
-                Text(store.channels.isEmpty
-                     ? "Les chaînes que tu explores apparaîtront ici."
-                     : "Maintiens le bouton central sur une chaîne pour l'épingler en favori ou la retirer.")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
+                if store.channels.isEmpty {
+                    emptyState.padding(.horizontal, Theme.hPad)
+                } else {
+                    Text("Maintiens le bouton central sur une chaîne pour l'épingler ou la retirer.")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, Theme.hPad)
+                }
             }
-            .padding(.horizontal, 90)
-            .padding(.vertical, 70)
+            .padding(.top, 70)
+            .padding(.bottom, 80)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .ignoresSafeArea(edges: .horizontal)
         .screenBackground()
         .onExitCommand(perform: exitApp)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 40) {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("VOD Recovery", systemImage: "clock.arrow.circlepath")
+                    .font(.headline)
+                    .foregroundStyle(Theme.accent)
+                Text("Explorer une chaîne")
+                    .font(.system(size: 76, weight: .bold))
+            }
+
+            HStack(spacing: 24) {
+                TextField("Nom de la chaîne Twitch", text: $query)
+                    .onSubmit(submit)
+                    .frame(maxWidth: .infinity)
+                Button(action: submit) {
+                    Label("Explorer", systemImage: "arrow.right")
+                        .padding(.horizontal, 16)
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(query.normalizedChannel.isEmpty)
+            }
+            .focusSection()
+        }
+    }
+
+    private var emptyState: some View {
+        HStack(spacing: 28) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 44, weight: .medium))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Tape le nom d'une chaîne pour commencer").font(.title3.weight(.semibold))
+                Text("Les chaînes que tu explores apparaîtront ici, et tu pourras épingler tes préférées.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 36, style: .continuous))
     }
 
     private func submit() {
@@ -63,19 +91,20 @@ struct HomeView: View {
 private struct ChannelShelf: View {
     @EnvironmentObject private var store: ChannelStore
     let title: String
-    let systemImage: String
     let entries: [ChannelEntry]
     let open: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Label(title, systemImage: systemImage)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, Theme.hPad)
             ScrollView(.horizontal) {
-                HStack(spacing: 36) {
+                LazyHStack(spacing: 48) {
                     ForEach(entries) { entry in
-                        ChannelCard(entry: entry) { open(entry.login) }
+                        Button { open(entry.login) } label: { ChannelCard(entry: entry) }
+                            .buttonStyle(LiftButtonStyle())
                             .contextMenu {
                                 Button(
                                     entry.pinned ? "Retirer des favoris" : "Épingler en favori",
@@ -87,8 +116,8 @@ private struct ChannelShelf: View {
                             }
                     }
                 }
-                .padding(.vertical, 30)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, Theme.hPad)
+                .padding(.vertical, 36)
             }
             .scrollClipDisabled()
         }
@@ -98,32 +127,27 @@ private struct ChannelShelf: View {
 
 private struct ChannelCard: View {
     let entry: ChannelEntry
-    let action: () -> Void
+    @Environment(\.isFocused) private var focused
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 18) {
-                Avatar(url: entry.avatar, name: entry.displayName)
-                    .frame(width: 150, height: 150)
-                    .overlay(alignment: .topTrailing) {
-                        if entry.pinned {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: 26, weight: .bold))
-                                .foregroundStyle(.yellow)
-                                .padding(10)
-                                .glassEffect(.regular, in: .circle)
-                                .offset(x: 10, y: -6)
-                        }
+        VStack(spacing: 22) {
+            Avatar(url: entry.avatar, name: entry.displayName)
+                .frame(width: 190, height: 190)
+                .overlay(Circle().strokeBorder(.white.opacity(focused ? 0.9 : 0.08), lineWidth: focused ? 5 : 2))
+                .overlay(alignment: .bottomTrailing) {
+                    if entry.pinned {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(Theme.accent)
+                            .padding(12)
+                            .glassEffect(.regular, in: .circle)
                     }
-                Text(entry.displayName)
-                    .font(.headline)
-                    .lineLimit(1)
-            }
-            .frame(width: 220)
-            .padding(.vertical, 28)
-            .padding(.horizontal, 12)
+                }
+            Text(entry.displayName)
+                .font(.headline)
+                .foregroundStyle(focused ? .primary : .secondary)
+                .lineLimit(1)
+                .frame(width: 230)
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.roundedRectangle(radius: 40))
     }
 }
